@@ -129,6 +129,7 @@
     <div class="lb-bar">
       <button class="btn ghost" id="lbPlay">▶ Reproducir</button>
       <button class="btn ghost" id="lbLoop" title="Repetir en bucle">🔁 Bucle</button>
+      <button class="btn ghost" id="lbFull" title="Pantalla completa (F)">⛶ Pantalla completa</button>
       <label>Intervalo
         <select id="lbInterval">
           <option value="2">2 s</option><option value="3">3 s</option><option value="4">4 s</option>
@@ -346,10 +347,13 @@ async function runSearch(term){
 function openItem(id,name,path,t){
   const back=returnFn;
   const cls = t==='audio' ? ' audio' : '';
+  const fsBtn = t==='audio' ? '' : `<button class="btn ghost" id="fsFrame" style="padding:7px 14px;margin-top:14px">⛶ Pantalla completa</button>`;
   main.innerHTML=`<div class="player"><button class="backbtn" id="back">← Volver</button>
     <div class="frame${cls}"><iframe src="https://drive.google.com/file/d/${id}/preview" allow="autoplay" allowfullscreen></iframe></div>
-    <h2>${escHtml(name)}</h2>${path?`<div class="vpath">${escHtml(path)}</div>`:''}</div>`;
+    <h2>${escHtml(name)}</h2>${path?`<div class="vpath">${escHtml(path)}</div>`:''}${fsBtn}</div>`;
   $('back').onclick=()=>(back||showHome)();
+  const fb=$('fsFrame'); if(fb) fb.onclick=()=> toggleFs(document.querySelector('.player .frame'));
+  updateFsLabels();
 }
 
 /* lightbox / pase de diapositivas */
@@ -385,10 +389,21 @@ function lbNext(){ if(lb.idx===lb.items.length-1){ if(!lb.loop) return; lb.idx=0
 function lbPrev(){ if(lb.idx===0){ if(!lb.loop) return; lb.idx=lb.items.length-1; } else lb.idx--; lbShow(); }
 function lbToggle(force){ lb.playing=(force!==undefined)?force:!lb.playing; $('lbPlay').textContent=lb.playing?'⏸ Pausa':'▶ Reproducir'; clearInterval(lb.timer); if(lb.playing) lb.timer=setInterval(lbAdvance, lb.interval*1000); }
 function lbClose(){ clearInterval(lb.timer); lb.playing=false; $('lightbox').classList.add('hidden'); document.removeEventListener('keydown', lbKey); }
-function lbKey(e){ if(e.key==='ArrowRight') lbNext(); else if(e.key==='ArrowLeft') lbPrev(); else if(e.key===' '){ e.preventDefault(); lbToggle(); } else if(e.key==='Escape') lbClose(); }
+function lbKey(e){ if(e.key==='ArrowRight') lbNext(); else if(e.key==='ArrowLeft') lbPrev(); else if(e.key===' '){ e.preventDefault(); lbToggle(); } else if(e.key==='f'||e.key==='F'){ toggleFs($('lightbox')); } else if(e.key==='Escape'){ if(!isFs()) lbClose(); } }
 $('lbNext').onclick=lbNext; $('lbPrev').onclick=lbPrev; $('lbPlay').onclick=()=>lbToggle(); $('lbClose').onclick=lbClose;
 $('lbLoop').onclick=()=>{ lb.loop=!lb.loop; localStorage.setItem('mm_slide_loop', lb.loop?'1':'0'); $('lbLoop').classList.toggle('on', lb.loop); };
 $('lbInterval').onchange=(e)=>{ lb.interval=parseInt(e.target.value)||SLIDE_SECONDS; localStorage.setItem('mm_slide_interval', String(lb.interval)); if(lb.playing) lbToggle(true); };
+$('lbFull').onclick=()=> toggleFs($('lightbox'));
+
+/* pantalla completa (Fullscreen API) */
+function isFs(){ return document.fullscreenElement || document.webkitFullscreenElement; }
+function toggleFs(el){ if(isFs()){ (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); } else if(el){ (el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el); } }
+function updateFsLabels(){ const on=!!isFs();
+  const lf=$('lbFull'); if(lf){ lf.textContent = on?'⛶ Salir':'⛶ Pantalla completa'; lf.classList.toggle('on', on); }
+  const pf=$('fsFrame'); if(pf) pf.textContent = on?'⛶ Salir de pantalla completa':'⛶ Pantalla completa';
+}
+document.addEventListener('fullscreenchange', updateFsLabels);
+document.addEventListener('webkitfullscreenchange', updateFsLabels);
 
 function showError(msg){ main.innerHTML=`<div class="state"><h3>Algo no fue bien</h3><div class="err">${msg}</div><button class="btn" onclick="boot()">Reintentar</button></div>`; }
 function escHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
