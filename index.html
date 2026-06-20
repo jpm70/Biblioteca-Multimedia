@@ -150,9 +150,10 @@ const SLIDE_SECONDS   = 4;     // segundos por foto en el pase de diapositivas
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 /* ========================================================================= */
 
+const MEDIA_CLAUSE = "(mimeType contains 'video/' or mimeType contains 'audio/' or mimeType contains 'image/')";
 const MODES = [];
-if(HARD_ROOT_VIDEO.trim()) MODES.push({key:'video', label:'Vídeos', root:HARD_ROOT_VIDEO.trim(), clause:"(mimeType contains 'video/' or mimeType contains 'audio/')", word:'archivo'});
-if(HARD_ROOT_PHOTO.trim()) MODES.push({key:'photo', label:'Fotos',  root:HARD_ROOT_PHOTO.trim(), clause:"mimeType contains 'image/'", word:'foto'});
+if(HARD_ROOT_VIDEO.trim()) MODES.push({key:'video', label:'Vídeos', root:HARD_ROOT_VIDEO.trim(), clause:MEDIA_CLAUSE, word:'elemento'});
+if(HARD_ROOT_PHOTO.trim()) MODES.push({key:'photo', label:'Fotos',  root:HARD_ROOT_PHOTO.trim(), clause:MEDIA_CLAUSE, word:'elemento'});
 
 const $ = (id)=>document.getElementById(id);
 const main = $('main');
@@ -167,8 +168,8 @@ let tree=null, flat=[], currentPath=[], returnFn=null, searching=false, viewItem
 function saveToken(t,s){ localStorage.setItem('mm_token', JSON.stringify({t, e:Date.now()+(s||3600)*1000})); }
 function loadToken(){ try{ const o=JSON.parse(localStorage.getItem('mm_token')); if(o && o.e-Date.now()>60000) return o.t; }catch(e){} return null; }
 function clearToken(){ localStorage.removeItem('mm_token'); }
-function cacheTree(root,t){ try{ localStorage.setItem('mm_tree_'+root, JSON.stringify(t)); }catch(e){} }
-function loadCachedTree(root){ try{ return JSON.parse(localStorage.getItem('mm_tree_'+root)); }catch(e){ return null; } }
+function cacheTree(root,t){ try{ localStorage.setItem('mm_tree_v2_'+root, JSON.stringify(t)); }catch(e){} }
+function loadCachedTree(root){ try{ return JSON.parse(localStorage.getItem('mm_tree_v2_'+root)); }catch(e){ return null; } }
 
 /* barra redimensionable */
 (()=>{ const w=localStorage.getItem('mm_side_w'); if(w) document.documentElement.style.setProperty('--side-w', w); })();
@@ -265,7 +266,7 @@ function renderScope(){ const c=$('scope'); if(MODES.length<2){ c.classList.add(
   c.querySelectorAll('button[data-k]').forEach(b=> b.onclick=()=>{ searchScope=b.dataset.k; renderScope(); const term=$('searchBox').value.trim(); if(term.length>=2) runSearch(term); }); }
 async function ensureMode(mode){
   activeMode=mode; searchScope=mode.key; renderTabs(); renderScope(); $('searchBox').value=''; searching=false;
-  $('searchBox').placeholder = mode.key==='photo' ? 'Buscar fotos…' : 'Buscar vídeos o audio…';
+  $('searchBox').placeholder = `Buscar en ${mode.label}…`;
   if(!state[mode.key]) main.innerHTML=spinner(`Indexando ${mode.label.toLowerCase()}…`);
   try{ await ensureData(mode); }catch(e){ showError('No se pudo leer la biblioteca. '+e.message); return; }
   tree=state[mode.key].tree; flat=state[mode.key].flat; renderSidebar(); showHome();
@@ -294,19 +295,20 @@ function openFolder(pathNodes, sidebarBtn){
     <span><span class="fc-name">${escHtml(f.name)}</span><br><span class="fc-sub">${word(countItems(f),activeMode)}</span></span></button>`).join('');
 
   viewItems=node.items.slice();
-  const photoMode=activeMode.key==='photo';
+  const imgs=node.items.filter(x=>x.t==='image');
+  const allImages = node.items.length>0 && imgs.length===node.items.length;
   const itemCards=node.items.map((v,i)=>card(v,false,i)).join('');
-  const slide = (photoMode && node.items.length) ? `<button class="btn ghost" id="slideBtn" style="padding:7px 14px">▶ Pase de diapositivas</button>` : '';
+  const slide = imgs.length ? `<button class="btn ghost" id="slideBtn" style="padding:7px 14px">▶ Pase de diapositivas</button>` : '';
 
   main.innerHTML = crumbs
     + `<div class="topline"><h2>${escHtml(node.name)}</h2><span class="count">${node.items.length?word(node.items.length,activeMode):''}</span>${slide}</div>`
     + (folderCards?`<div class="grid folders">${folderCards}</div>`:'')
-    + (itemCards?`<div class="grid${photoMode?' photos':''}">${itemCards}</div>`:'')
+    + (itemCards?`<div class="grid${allImages?' photos':''}">${itemCards}</div>`:'')
     + (!folderCards&&!itemCards?`<div class="state" style="height:auto;margin-top:30px"><p>Esta carpeta está vacía.</p></div>`:'');
 
   main.querySelectorAll('.crumbs button[data-i]').forEach(b=> b.onclick=()=> openFolder(pathNodes.slice(0,+b.dataset.i+1)));
   main.querySelectorAll('.folder-card').forEach(b=> b.onclick=()=> openFolder([...pathNodes, node.folders[+b.dataset.fi]]));
-  const sb=$('slideBtn'); if(sb) sb.onclick=()=> openLightbox(viewItems.filter(x=>x.t==='image'),0,true);
+  const sb=$('slideBtn'); if(sb) sb.onclick=()=> openLightbox(imgs,0,true);
   bindCards();
 }
 
@@ -337,10 +339,11 @@ async function runSearch(term){
   const hits=state[mode.key].flat.filter(v=> v.name.toLowerCase().includes(low));
   viewItems=hits.slice();
   if(!hits.length){ main.innerHTML=`<div class="topline"><h2>Búsqueda en ${mode.label}</h2></div><div class="state" style="height:auto;margin-top:30px"><h3>Sin resultados</h3><p>Nada coincide con “${escHtml(term)}”.</p></div>`; return; }
-  const photoMode=mode.key==='photo';
-  const slide = (photoMode) ? `<button class="btn ghost" id="slideBtn" style="padding:7px 14px">▶ Pase de diapositivas</button>` : '';
-  main.innerHTML=`<div class="topline"><h2>Resultados en ${mode.label}</h2><span class="count">${word(hits.length,mode)}</span>${slide}</div><div class="grid${photoMode?' photos':''}">${hits.map((v,i)=>card(v,true,i)).join('')}</div>`;
-  const sb=$('slideBtn'); if(sb) sb.onclick=()=> openLightbox(hits.filter(x=>x.t==='image'),0,true);
+  const imgs=hits.filter(x=>x.t==='image');
+  const allImages = hits.length>0 && imgs.length===hits.length;
+  const slide = imgs.length ? `<button class="btn ghost" id="slideBtn" style="padding:7px 14px">▶ Pase de diapositivas</button>` : '';
+  main.innerHTML=`<div class="topline"><h2>Resultados en ${mode.label}</h2><span class="count">${word(hits.length,mode)}</span>${slide}</div><div class="grid${allImages?' photos':''}">${hits.map((v,i)=>card(v,true,i)).join('')}</div>`;
+  const sb=$('slideBtn'); if(sb) sb.onclick=()=> openLightbox(imgs,0,true);
   bindCards();
 }
 
@@ -409,7 +412,7 @@ function showError(msg){ main.innerHTML=`<div class="state"><h3>Algo no fue bien
 function escHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 $('searchBox').addEventListener('input', e=>onSearch(e.target.value));
-$('refreshBtn').onclick=()=>{ localStorage.removeItem('mm_tree_'+activeMode.root); delete state[activeMode.key]; ensureMode(activeMode); };
+$('refreshBtn').onclick=()=>{ localStorage.removeItem('mm_tree_v2_'+activeMode.root); delete state[activeMode.key]; ensureMode(activeMode); };
 $('signOut').onclick=()=>{ clearToken(); accessToken=null; hasConsented=false; showWelcome(); $('courseList').innerHTML='<div class="label">Carpetas</div>'; };
 boot();
 </script>
