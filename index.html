@@ -102,7 +102,8 @@
   /* lightbox / pase de diapositivas */
   .lightbox{position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:50; background:#0a0c10; overflow:hidden}
   .lb-stage{position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; padding:0; text-align:center}
-  .lb-stage img{max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; margin:auto; display:block}
+  /* imagen: posicionamiento absoluto + margin:auto = centrado y "contain" a prueba de bugs de flexbox (vertical y horizontal) */
+  .lb-stage img{position:absolute; top:0; left:0; right:0; bottom:0; margin:auto; max-width:100%; max-height:100%; width:auto; height:auto; display:block}
   .lb-nav{position:absolute; top:50%; transform:translateY(-50%); z-index:3; background:rgba(27,33,41,.7); border:1px solid var(--border); color:var(--text); width:48px; height:48px; border-radius:50%; font-size:26px; cursor:pointer; display:flex; align-items:center; justify-content:center}
   .lb-nav:hover{border-color:var(--accent); color:var(--accent)} .lb-prev{left:18px} .lb-next{right:18px}
   .lb-close{position:absolute; top:16px; right:18px; z-index:3; background:none; border:0; color:var(--muted); font-size:30px; cursor:pointer; line-height:1} .lb-close:hover{color:var(--text)}
@@ -414,11 +415,16 @@ let lbHideTimer=null;
 function lbShowUI(){ const lx=$('lightbox'); lx.classList.remove('tvhide'); clearTimeout(lbHideTimer);
   lbHideTimer=setTimeout(()=>{ if(!$('lightbox').classList.contains('hidden')) $('lightbox').classList.add('tvhide'); }, 4000); }
 function lbHideUI(){ clearTimeout(lbHideTimer); $('lightbox').classList.add('tvhide'); }
+let lbHistoryPushed=false;
+function lbPop(){ if(!$('lightbox').classList.contains('hidden')) lbCloseInternal(); }
 async function openLightbox(items, idx, autoplay){
   if(!items.length) return;
   lb.items=items; lb.idx=idx; lb.playing=false;
   lbInitControls();
   $('lightbox').classList.remove('hidden'); document.addEventListener('keydown', lbKey);
+  // atrapa el botón "atrás" del mando: mientras el visor esté abierto, "atrás" lo cierra en vez de salir de la web
+  lbHistoryPushed=false;
+  try{ history.pushState({mmLightbox:1}, ''); lbHistoryPushed=true; window.addEventListener('popstate', lbPop); }catch(e){}
   lbShowUI();
   await lbShow(); if(autoplay) lbToggle(true);
 }
@@ -437,13 +443,20 @@ function lbAdvance(){ // auto-avance del temporizador
 function lbNext(){ if(lb.idx===lb.items.length-1){ if(!lb.loop) return; lb.idx=0; } else lb.idx++; lbShow(); }
 function lbPrev(){ if(lb.idx===0){ if(!lb.loop) return; lb.idx=lb.items.length-1; } else lb.idx--; lbShow(); }
 function lbToggle(force){ lb.playing=(force!==undefined)?force:!lb.playing; $('lbPlay').textContent=lb.playing?'⏸ Pausa':'▶ Reproducir'; clearInterval(lb.timer); if(lb.playing) lb.timer=setInterval(lbAdvance, lb.interval*1000); }
-function lbClose(){ clearInterval(lb.timer); clearTimeout(lbHideTimer); lb.playing=false; $('lightbox').classList.remove('tvhide'); $('lightbox').classList.add('hidden'); document.removeEventListener('keydown', lbKey); }
+function lbCloseInternal(){ clearInterval(lb.timer); clearTimeout(lbHideTimer); lb.playing=false;
+  $('lightbox').classList.remove('tvhide'); $('lightbox').classList.add('hidden');
+  document.removeEventListener('keydown', lbKey); window.removeEventListener('popstate', lbPop);
+  if(isFs()) toggleFs($('lightbox')); }
+function lbClose(){ // salida "manual" (botón X o tecla): deshace la entrada de historial, lo que dispara lbPop -> lbCloseInternal
+  if(lbHistoryPushed && history.state && history.state.mmLightbox){ lbHistoryPushed=false; history.back(); }
+  else lbCloseInternal(); }
 function lbKey(e){ lbShowUI();
-  if(e.key==='ArrowRight') lbNext();
-  else if(e.key==='ArrowLeft') lbPrev();
-  else if(e.key===' '||e.key==='Enter'){ e.preventDefault(); lbToggle(); }
-  else if(e.key==='f'||e.key==='F'){ toggleFs($('lightbox')); }
-  else if(e.key==='Escape'||e.key==='Backspace'||e.key==='BrowserBack'||e.key==='GoBack'){ e.preventDefault(); if(isFs()) toggleFs($('lightbox')); else lbClose(); } }
+  const dir=dpadDir(e);
+  if(dir==='right'||dir==='down'){ if(e.preventDefault) e.preventDefault(); lbNext(); }
+  else if(dir==='left'||dir==='up'){ if(e.preventDefault) e.preventDefault(); lbPrev(); }
+  else if(isBackKey(e)){ if(e.preventDefault) e.preventDefault(); if(isFs()) toggleFs($('lightbox')); else lbClose(); }
+  else if(isOkKey(e)){ if(e.preventDefault) e.preventDefault(); lbToggle(); }
+  else if(e.key==='f'||e.key==='F'){ toggleFs($('lightbox')); } }
 $('lbNext').onclick=lbNext; $('lbPrev').onclick=lbPrev; $('lbPlay').onclick=()=>lbToggle(); $('lbClose').onclick=lbClose;
 $('lbLoop').onclick=()=>{ lb.loop=!lb.loop; localStorage.setItem('mm_slide_loop', lb.loop?'1':'0'); $('lbLoop').classList.toggle('on', lb.loop); };
 $('lbInterval').onchange=(e)=>{ lb.interval=parseInt(e.target.value)||SLIDE_SECONDS; localStorage.setItem('mm_slide_interval', String(lb.interval)); if(lb.playing) lbToggle(true); };
