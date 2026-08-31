@@ -508,14 +508,19 @@ function tvFocusFirst(){
           || document.querySelector('#courseList .course');
   if(el) el.focus({preventScroll:true});
 }
-/* normaliza teclas del mando: algunos navegadores de TV no rellenan e.key, solo keyCode */
+/* normaliza teclas del mando: algunos navegadores de TV no rellenan e.key, solo keyCode,
+   y algunos pasan los códigos crudos de Android (DPAD 19-23) en vez de 37-40 */
 function dpadDir(e){
-  const k=e.key||'', c=e.keyCode||e.which||0;
-  if(k==='ArrowUp'||k==='Up'||c===38) return 'up';
-  if(k==='ArrowDown'||k==='Down'||c===40) return 'down';
-  if(k==='ArrowLeft'||k==='Left'||c===37) return 'left';
-  if(k==='ArrowRight'||k==='Right'||c===39) return 'right';
+  const k=e.key||'', c=e.keyCode||e.which||e.detail||0;
+  if(k==='ArrowUp'||k==='Up'||c===38||c===19) return 'up';
+  if(k==='ArrowDown'||k==='Down'||c===40||c===20) return 'down';
+  if(k==='ArrowLeft'||k==='Left'||c===37||c===21) return 'left';
+  if(k==='ArrowRight'||k==='Right'||c===39||c===22) return 'right';
   return null;
+}
+function isOkKey(e){
+  const k=e.key||'', c=e.keyCode||e.which||0;
+  return k==='Enter'||k===' '||k==='Spacebar'||c===13||c===23||c===32||c===66;
 }
 function isBackKey(e){
   const k=e.key||'', c=e.keyCode||e.which||0;
@@ -536,6 +541,12 @@ function tvKeyHandler(e){
   const t=e.target, tag=((t&&t.tagName)||'').toLowerCase();
   if(tag==='iframe'){ if(isBackKey(e)){ const b=$('back'); if(b){ e.preventDefault(); b.click(); } } return; }
   if(tag==='input' || tag==='textarea'){ if(dpadDir(e)==='down'){ e.preventDefault(); tvFocusFirst(); } return; }
+  // OK / centro del mando: si el navegador manda el código crudo de Android (23/66) el botón no se activa solo
+  if(isOkKey(e) && (e.keyCode===23||e.keyCode===66)){
+    const a=document.activeElement;
+    if(a && a!==document.body && typeof a.click==='function'){ e.preventDefault(); a.click(); }
+    return;
+  }
   const dir=dpadDir(e);
   if(dir){
     let acted=moveFocus(dir);
@@ -561,9 +572,13 @@ if(location.search.indexOf('debug')>-1){
   d.textContent='DEBUG teclas — pulsa la cruceta del mando';
   document.addEventListener('DOMContentLoaded',()=>document.body.appendChild(d));
   if(document.body) document.body.appendChild(d);
-  const show=(tag,e)=>{ d.textContent=`${tag}  key="${e.key}"  code="${e.code}"  keyCode=${e.keyCode}  which=${e.which}  dir=${dpadDir(e)||'-'}`; };
+  const hist=[];
+  const show=(tag,e)=>{ hist.unshift(`${tag} key="${e.key}" code="${e.code}" keyCode=${e.keyCode} which=${e.which} -> dir=${dpadDir(e)||'-'} back=${isBackKey(e)} ok=${isOkKey(e)}`);
+    hist.length=Math.min(hist.length,6); d.textContent='DEBUG mando:\n'+hist.join('\n'); };
+  d.style.whiteSpace='pre';
   window.addEventListener('keydown',e=>show('keydown',e),true);
   window.addEventListener('keyup',e=>show('keyup',e),true);
+  ['click'].forEach(t=>window.addEventListener(t,e=>{ hist.unshift('click en '+((e.target&&e.target.tagName)||'?')+'.'+((e.target&&e.target.className)||'')); hist.length=Math.min(hist.length,6); d.textContent='DEBUG mando:\n'+hist.join('\n'); },true));
 }
 
 boot();
