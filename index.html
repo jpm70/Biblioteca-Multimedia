@@ -81,19 +81,40 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .hidden{display:none!important}
 
+  /* --- foco visible para navegación con el mando de la TV --- */
+  .card:focus,.folder-card:focus,.course:focus,.tab:focus,.scope button:focus,
+  .crumbs button:focus,.backbtn:focus,.btn:focus,.linkbtn:focus,#searchBox:focus,
+  .lb-nav:focus,.lb-close:focus,.lb-bar select:focus,.player .frame iframe:focus{
+    outline:3px solid var(--accent); outline-offset:2px;
+  }
+  .card:focus,.folder-card:focus{ outline:4px solid var(--accent); outline-offset:2px; border-color:var(--accent); transform:translateY(-2px); }
+  .course:focus{ background:var(--panel-2); }
+  @supports selector(:focus-visible){
+    .card:focus:not(:focus-visible),.folder-card:focus:not(:focus-visible),
+    .course:focus:not(:focus-visible),.tab:focus:not(:focus-visible),
+    .scope button:focus:not(:focus-visible),.btn:focus:not(:focus-visible),
+    .linkbtn:focus:not(:focus-visible),.crumbs button:focus:not(:focus-visible),
+    .backbtn:focus:not(:focus-visible){ outline:none; }
+  }
+  .main,.courses{ scroll-behavior:smooth; }
+  .card,.folder-card,.course{ scroll-margin:100px; }
+
   /* lightbox / pase de diapositivas */
   .lightbox{position:fixed; inset:0; z-index:50; background:rgba(8,10,14,.96); display:flex; flex-direction:column}
-  .lb-stage{flex:1; display:flex; align-items:center; justify-content:center; padding:24px; min-height:0}
-  .lb-stage img{max-width:100%; max-height:100%; object-fit:contain; border-radius:8px}
+  .lb-stage{flex:1; display:flex; align-items:center; justify-content:center; padding:0; min-height:0}
+  .lb-stage img{max-width:100vw; max-height:100vh; object-fit:contain}
   .lb-nav{position:absolute; top:50%; transform:translateY(-50%); background:rgba(27,33,41,.7); border:1px solid var(--border); color:var(--text); width:48px; height:48px; border-radius:50%; font-size:26px; cursor:pointer; display:flex; align-items:center; justify-content:center}
   .lb-nav:hover{border-color:var(--accent); color:var(--accent)} .lb-prev{left:18px} .lb-next{right:18px}
   .lb-close{position:absolute; top:16px; right:18px; background:none; border:0; color:var(--muted); font-size:30px; cursor:pointer; line-height:1} .lb-close:hover{color:var(--text)}
-  .lb-bar{display:flex; align-items:center; gap:14px; justify-content:center; padding:14px; border-top:1px solid var(--border); flex-wrap:wrap}
+  .lb-bar{position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; gap:14px; justify-content:center; padding:16px 14px 18px; background:linear-gradient(to top, rgba(8,10,14,.94), rgba(8,10,14,.5) 65%, rgba(8,10,14,0)); flex-wrap:wrap; transition:opacity .25s}
   .lb-bar label{color:var(--muted); font-size:13px; display:flex; align-items:center; gap:6px}
   .lb-bar select{background:var(--ink); color:var(--text); border:1px solid var(--border); border-radius:7px; padding:5px 8px; font:inherit; font-size:13px; cursor:pointer}
   .btn.ghost.on{border-color:var(--accent); color:var(--accent)}
   .lb-bar .lb-counter{color:var(--muted); font-size:13px} .lb-bar .lb-caption{color:var(--faint); font-size:13px; max-width:50vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  ::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px}
+  .lb-nav,.lb-close{transition:opacity .25s}
+  .lightbox.tvhide .lb-bar,.lightbox.tvhide .lb-nav,.lightbox.tvhide .lb-close{opacity:0;pointer-events:none}
+  .lightbox.tvhide{cursor:none}
+  ::-webkit-scrollbar{width:14px;height:14px} ::-webkit-scrollbar-thumb{background:var(--faint);border-radius:7px} ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
 </style>
 </head>
 <body>
@@ -129,7 +150,7 @@
     <div class="lb-bar">
       <button class="btn ghost" id="lbPlay">▶ Reproducir</button>
       <button class="btn ghost" id="lbLoop" title="Repetir en bucle">🔁 Bucle</button>
-      <button class="btn ghost" id="lbFull" title="Pantalla completa (F)">⛶ Pantalla completa</button>
+      <button class="btn ghost" id="lbFull" title="Ocultar controles / pantalla completa (F)">⛶ Solo imagen</button>
       <label>Intervalo
         <select id="lbInterval">
           <option value="2">2 s</option><option value="3">3 s</option><option value="4">4 s</option>
@@ -256,6 +277,7 @@ function showWelcome(){
     <h3>Accede para ver el contenido</h3><p>Inicia sesión con la cuenta que tiene acceso. Solo lectura. La sesión se recuerda al recargar.</p>
     <button class="btn" id="connectBtn">Acceder con Google</button></div>`;
   $('connectBtn').onclick=()=> requestToken(false).then(onSignedIn).catch(()=> showError('No se pudo acceder. Revisa que tu cuenta tenga acceso y esté autorizada.'));
+  $('connectBtn').focus({preventScroll:true});
 }
 function onSignedIn(){ $('userState').textContent='Conectado'; $('signOut').classList.remove('hidden'); $('refreshBtn').classList.remove('hidden'); $('searchBox').disabled=false; renderTabs(); renderScope(); ensureMode(activeMode); }
 function renderTabs(){ const c=$('tabs'); if(MODES.length<2){ c.classList.add('hidden'); return; } c.classList.remove('hidden');
@@ -281,7 +303,8 @@ function renderSidebar(){
 }
 function setActive(btn){ document.querySelectorAll('.course').forEach(c=>c.classList.remove('active')); if(btn) btn.classList.add('active'); }
 function showHome(){ setActive(null); currentPath=[]; searching=false; returnFn=showHome;
-  main.innerHTML=`<div class="state"><h3>Elige una carpeta</h3><p>Selecciona una carpeta a la izquierda, o busca por nombre.</p></div>`; }
+  main.innerHTML=`<div class="state"><h3>Elige una carpeta</h3><p>Selecciona una carpeta a la izquierda, o busca por nombre.</p></div>`;
+  const c=document.querySelector('#courseList .course'); if(c) c.focus({preventScroll:true}); }
 
 function openFolder(pathNodes, sidebarBtn){
   currentPath=pathNodes; searching=false; returnFn=()=>openFolder(pathNodes);
@@ -310,6 +333,7 @@ function openFolder(pathNodes, sidebarBtn){
   main.querySelectorAll('.folder-card').forEach(b=> b.onclick=()=> openFolder([...pathNodes, node.folders[+b.dataset.fi]]));
   const sb=$('slideBtn'); if(sb) sb.onclick=()=> openLightbox(imgs,0,true);
   bindCards();
+  tvFocusFirst();
 }
 
 function card(v, showPath, idx){
@@ -345,6 +369,7 @@ async function runSearch(term){
   main.innerHTML=`<div class="topline"><h2>Resultados en ${mode.label}</h2><span class="count">${word(hits.length,mode)}</span>${slide}</div><div class="grid${allImages?' photos':''}">${hits.map((v,i)=>card(v,true,i)).join('')}</div>`;
   const sb=$('slideBtn'); if(sb) sb.onclick=()=> openLightbox(imgs,0,true);
   bindCards();
+  tvFocusFirst();
 }
 
 function openItem(id,name,path,t){
@@ -357,6 +382,7 @@ function openItem(id,name,path,t){
   $('back').onclick=()=>(back||showHome)();
   const fb=$('fsFrame'); if(fb) fb.onclick=()=> toggleFs(document.querySelector('.player .frame'));
   updateFsLabels();
+  $('back').focus({preventScroll:true});
 }
 
 /* lightbox / pase de diapositivas */
@@ -369,11 +395,17 @@ function lbInitControls(){
   $('lbInterval').value = String(lb.interval);
   $('lbLoop').classList.toggle('on', lb.loop);
 }
+/* auto-ocultar los controles del visor (Salir/Bucle/Intervalo) para foto a pantalla completa real */
+let lbHideTimer=null;
+function lbShowUI(){ const lx=$('lightbox'); lx.classList.remove('tvhide'); clearTimeout(lbHideTimer);
+  lbHideTimer=setTimeout(()=>{ if(!$('lightbox').classList.contains('hidden')) $('lightbox').classList.add('tvhide'); }, 4000); }
+function lbHideUI(){ clearTimeout(lbHideTimer); $('lightbox').classList.add('tvhide'); }
 async function openLightbox(items, idx, autoplay){
   if(!items.length) return;
   lb.items=items; lb.idx=idx; lb.playing=false;
   lbInitControls();
   $('lightbox').classList.remove('hidden'); document.addEventListener('keydown', lbKey);
+  lbShowUI();
   await lbShow(); if(autoplay) lbToggle(true);
 }
 async function lbShow(){
@@ -391,18 +423,25 @@ function lbAdvance(){ // auto-avance del temporizador
 function lbNext(){ if(lb.idx===lb.items.length-1){ if(!lb.loop) return; lb.idx=0; } else lb.idx++; lbShow(); }
 function lbPrev(){ if(lb.idx===0){ if(!lb.loop) return; lb.idx=lb.items.length-1; } else lb.idx--; lbShow(); }
 function lbToggle(force){ lb.playing=(force!==undefined)?force:!lb.playing; $('lbPlay').textContent=lb.playing?'⏸ Pausa':'▶ Reproducir'; clearInterval(lb.timer); if(lb.playing) lb.timer=setInterval(lbAdvance, lb.interval*1000); }
-function lbClose(){ clearInterval(lb.timer); lb.playing=false; $('lightbox').classList.add('hidden'); document.removeEventListener('keydown', lbKey); }
-function lbKey(e){ if(e.key==='ArrowRight') lbNext(); else if(e.key==='ArrowLeft') lbPrev(); else if(e.key===' '){ e.preventDefault(); lbToggle(); } else if(e.key==='f'||e.key==='F'){ toggleFs($('lightbox')); } else if(e.key==='Escape'){ if(!isFs()) lbClose(); } }
+function lbClose(){ clearInterval(lb.timer); clearTimeout(lbHideTimer); lb.playing=false; $('lightbox').classList.remove('tvhide'); $('lightbox').classList.add('hidden'); document.removeEventListener('keydown', lbKey); }
+function lbKey(e){ lbShowUI();
+  if(e.key==='ArrowRight') lbNext();
+  else if(e.key==='ArrowLeft') lbPrev();
+  else if(e.key===' '||e.key==='Enter'){ e.preventDefault(); lbToggle(); }
+  else if(e.key==='f'||e.key==='F'){ toggleFs($('lightbox')); }
+  else if(e.key==='Escape'||e.key==='Backspace'||e.key==='BrowserBack'||e.key==='GoBack'){ e.preventDefault(); if(isFs()) toggleFs($('lightbox')); else lbClose(); } }
 $('lbNext').onclick=lbNext; $('lbPrev').onclick=lbPrev; $('lbPlay').onclick=()=>lbToggle(); $('lbClose').onclick=lbClose;
 $('lbLoop').onclick=()=>{ lb.loop=!lb.loop; localStorage.setItem('mm_slide_loop', lb.loop?'1':'0'); $('lbLoop').classList.toggle('on', lb.loop); };
 $('lbInterval').onchange=(e)=>{ lb.interval=parseInt(e.target.value)||SLIDE_SECONDS; localStorage.setItem('mm_slide_interval', String(lb.interval)); if(lb.playing) lbToggle(true); };
-$('lbFull').onclick=()=> toggleFs($('lightbox'));
+$('lbFull').onclick=()=>{ toggleFs($('lightbox')); lbHideUI(); };
+$('lightbox').addEventListener('pointermove', lbShowUI);
+$('lbStage').addEventListener('click', lbShowUI);
 
 /* pantalla completa (Fullscreen API) */
 function isFs(){ return document.fullscreenElement || document.webkitFullscreenElement; }
 function toggleFs(el){ if(isFs()){ (document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document); } else if(el){ (el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el); } }
 function updateFsLabels(){ const on=!!isFs();
-  const lf=$('lbFull'); if(lf){ lf.textContent = on?'⛶ Salir':'⛶ Pantalla completa'; lf.classList.toggle('on', on); }
+  const lf=$('lbFull'); if(lf){ lf.textContent = on?'⛶ Salir':'⛶ Solo imagen'; lf.classList.toggle('on', on); }
   const pf=$('fsFrame'); if(pf) pf.textContent = on?'⛶ Salir de pantalla completa':'⛶ Pantalla completa';
 }
 document.addEventListener('fullscreenchange', updateFsLabels);
@@ -414,6 +453,63 @@ function escHtml(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt
 $('searchBox').addEventListener('input', e=>onSearch(e.target.value));
 $('refreshBtn').onclick=()=>{ localStorage.removeItem('mm_tree_v2_'+activeMode.root); delete state[activeMode.key]; ensureMode(activeMode); };
 $('signOut').onclick=()=>{ clearToken(); accessToken=null; hasConsented=false; showWelcome(); $('courseList').innerHTML='<div class="label">Carpetas</div>'; };
+
+/* ================= Navegación con el mando de la TV (cruceta) ================= */
+const NAV_SEL='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),iframe,[tabindex]:not([tabindex="-1"])';
+function navItems(){
+  return [...document.querySelectorAll(NAV_SEL)].filter(el=>{
+    if(el.id==='resizer' || el.closest('.hidden')) return false;
+    const r=el.getBoundingClientRect();
+    return r.width>1 && r.height>1 && el.offsetParent!==null;
+  });
+}
+function scrollNice(el){ try{ el.scrollIntoView({block:'center',inline:'center',behavior:'smooth'}); }catch(e){ el.scrollIntoView(); } }
+function moveFocus(dir){
+  const items=navItems(); if(!items.length) return false;
+  const cur=document.activeElement;
+  if(!cur || cur===document.body || !items.includes(cur)){
+    const t=main.querySelector(NAV_SEL)||items[0];
+    if(t){ t.focus({preventScroll:true}); scrollNice(t); return true; }
+    return false;
+  }
+  const r=cur.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+  let best=null, bestScore=Infinity;
+  for(const el of items){
+    if(el===cur) continue;
+    const b=el.getBoundingClientRect(), bx=b.left+b.width/2, by=b.top+b.height/2;
+    const dx=bx-cx, dy=by-cy; let along, across;
+    if(dir==='left'){ if(dx>-6) continue; along=-dx; across=Math.abs(dy); }
+    else if(dir==='right'){ if(dx<6) continue; along=dx; across=Math.abs(dy); }
+    else if(dir==='up'){ if(dy>-6) continue; along=-dy; across=Math.abs(dx); }
+    else { if(dy<6) continue; along=dy; across=Math.abs(dx); }
+    const score=along + across*2.4;
+    if(score<bestScore){ bestScore=score; best=el; }
+  }
+  if(best){ best.focus({preventScroll:true}); scrollNice(best); return true; }
+  return false;
+}
+function tvFocusFirst(){
+  const el = main.querySelector('.folder-card,.card,.backbtn,.crumbs button,#connectBtn,.btn')
+          || document.querySelector('#courseList .course');
+  if(el) el.focus({preventScroll:true});
+}
+window.addEventListener('keydown', e=>{
+  const lx=$('lightbox'); if(lx && !lx.classList.contains('hidden')) return;   // el visor gestiona sus propias teclas
+  if(e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+  const t=e.target, tag=(t.tagName||'').toLowerCase(), k=e.key;
+  const isBack=(k==='Backspace'||k==='BrowserBack'||k==='GoBack'||k==='Escape');
+  if(tag==='iframe'){ if(isBack){ const b=$('back'); if(b){ e.preventDefault(); b.click(); } } return; }
+  if(tag==='input' || tag==='textarea'){ if(k==='ArrowDown'){ e.preventDefault(); tvFocusFirst(); } return; }
+  if(k==='ArrowRight'||k==='ArrowLeft'||k==='ArrowUp'||k==='ArrowDown'){
+    const dir=k.slice(5).toLowerCase();
+    if(!moveFocus(dir) && (dir==='down'||dir==='up')) main.scrollBy({top:(dir==='down'?1:-1)*main.clientHeight*0.8,behavior:'smooth'});
+    e.preventDefault();
+  }
+  else if(k==='PageDown'){ e.preventDefault(); main.scrollBy({top:main.clientHeight*0.9,behavior:'smooth'}); }
+  else if(k==='PageUp'){ e.preventDefault(); main.scrollBy({top:-main.clientHeight*0.9,behavior:'smooth'}); }
+  else if(isBack){ const b=$('back'); if(b){ e.preventDefault(); b.click(); } }
+});
+
 boot();
 </script>
 </body>
