@@ -100,13 +100,13 @@
   .card,.folder-card,.course{ scroll-margin:100px; }
 
   /* lightbox / pase de diapositivas */
-  .lightbox{position:fixed; inset:0; z-index:50; background:rgba(8,10,14,.96); display:flex; flex-direction:column}
-  .lb-stage{flex:1; display:flex; align-items:center; justify-content:center; padding:0; min-height:0}
-  .lb-stage img{max-width:100vw; max-height:100vh; object-fit:contain}
-  .lb-nav{position:absolute; top:50%; transform:translateY(-50%); background:rgba(27,33,41,.7); border:1px solid var(--border); color:var(--text); width:48px; height:48px; border-radius:50%; font-size:26px; cursor:pointer; display:flex; align-items:center; justify-content:center}
+  .lightbox{position:fixed; top:0; left:0; right:0; bottom:0; width:100%; height:100%; z-index:50; background:#0a0c10; overflow:hidden}
+  .lb-stage{position:absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; padding:0; text-align:center}
+  .lb-stage img{max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; margin:auto; display:block}
+  .lb-nav{position:absolute; top:50%; transform:translateY(-50%); z-index:3; background:rgba(27,33,41,.7); border:1px solid var(--border); color:var(--text); width:48px; height:48px; border-radius:50%; font-size:26px; cursor:pointer; display:flex; align-items:center; justify-content:center}
   .lb-nav:hover{border-color:var(--accent); color:var(--accent)} .lb-prev{left:18px} .lb-next{right:18px}
-  .lb-close{position:absolute; top:16px; right:18px; background:none; border:0; color:var(--muted); font-size:30px; cursor:pointer; line-height:1} .lb-close:hover{color:var(--text)}
-  .lb-bar{position:absolute; left:0; right:0; bottom:0; display:flex; align-items:center; gap:14px; justify-content:center; padding:16px 14px 18px; background:linear-gradient(to top, rgba(8,10,14,.94), rgba(8,10,14,.5) 65%, rgba(8,10,14,0)); flex-wrap:wrap; transition:opacity .25s}
+  .lb-close{position:absolute; top:16px; right:18px; z-index:3; background:none; border:0; color:var(--muted); font-size:30px; cursor:pointer; line-height:1} .lb-close:hover{color:var(--text)}
+  .lb-bar{position:absolute; left:0; right:0; bottom:0; z-index:3; display:flex; align-items:center; gap:14px; justify-content:center; padding:16px 14px 18px; background:linear-gradient(to top, rgba(8,10,14,.94), rgba(8,10,14,.5) 65%, rgba(8,10,14,0)); flex-wrap:wrap; transition:opacity .25s}
   .lb-bar label{color:var(--muted); font-size:13px; display:flex; align-items:center; gap:6px}
   .lb-bar select{background:var(--ink); color:var(--text); border:1px solid var(--border); border-radius:7px; padding:5px 8px; font:inherit; font-size:13px; cursor:pointer}
   .btn.ghost.on{border-color:var(--accent); color:var(--accent)}
@@ -114,6 +114,14 @@
   .lb-nav,.lb-close{transition:opacity .25s}
   .lightbox.tvhide .lb-bar,.lightbox.tvhide .lb-nav,.lightbox.tvhide .lb-close{opacity:0;pointer-events:none}
   .lightbox.tvhide{cursor:none}
+
+  /* botones flotantes de scroll (red de seguridad si el mando no mueve el foco) */
+  .tvscroll{position:fixed; right:14px; top:50%; transform:translateY(-50%); z-index:40; display:flex; flex-direction:column; gap:10px; opacity:.4; transition:opacity .2s}
+  .tvscroll:hover,.tvscroll:focus-within{opacity:1}
+  .tvscroll button{width:52px; height:52px; border-radius:50%; background:rgba(27,33,41,.92); border:1px solid var(--border); color:var(--text); font-size:19px; cursor:pointer; display:flex; align-items:center; justify-content:center}
+  .tvscroll button:hover{border-color:var(--accent); color:var(--accent)}
+  .tvscroll button:focus{border-color:var(--accent); color:var(--accent); outline:3px solid var(--accent); outline-offset:2px}
+  @media (max-width:760px){ .tvscroll{right:8px} }
   ::-webkit-scrollbar{width:14px;height:14px} ::-webkit-scrollbar-thumb{background:var(--faint);border-radius:7px} ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
 </style>
 </head>
@@ -141,6 +149,12 @@
 
   <div class="resizer" id="resizer" title="Arrastra para redimensionar"></div>
   <main class="main" id="main"></main>
+
+  <div class="tvscroll" id="tvscroll">
+    <button id="tvUp" title="Subir" aria-label="Subir">▲</button>
+    <button id="tvBack" title="Volver" aria-label="Volver">◀</button>
+    <button id="tvDown" title="Bajar" aria-label="Bajar">▼</button>
+  </div>
 
   <div class="lightbox hidden" id="lightbox">
     <button class="lb-close" id="lbClose">×</button>
@@ -458,12 +472,13 @@ $('signOut').onclick=()=>{ clearToken(); accessToken=null; hasConsented=false; s
 const NAV_SEL='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),iframe,[tabindex]:not([tabindex="-1"])';
 function navItems(){
   return [...document.querySelectorAll(NAV_SEL)].filter(el=>{
-    if(el.id==='resizer' || el.closest('.hidden')) return false;
+    if(el.id==='resizer' || el.closest('.hidden') || el.closest('#tvscroll')) return false;
     const r=el.getBoundingClientRect();
     return r.width>1 && r.height>1 && el.offsetParent!==null;
   });
 }
-function scrollNice(el){ try{ el.scrollIntoView({block:'center',inline:'center',behavior:'smooth'}); }catch(e){ el.scrollIntoView(); } }
+function scrollNice(el){ try{ el.scrollIntoView({block:'center',inline:'center'}); }catch(e){ try{ el.scrollIntoView(); }catch(_){} } }
+function scrollMain(delta){ try{ main.scrollBy(0,delta); }catch(e){ main.scrollTop += delta; } }
 function moveFocus(dir){
   const items=navItems(); if(!items.length) return false;
   const cur=document.activeElement;
@@ -493,22 +508,63 @@ function tvFocusFirst(){
           || document.querySelector('#courseList .course');
   if(el) el.focus({preventScroll:true});
 }
-window.addEventListener('keydown', e=>{
+/* normaliza teclas del mando: algunos navegadores de TV no rellenan e.key, solo keyCode */
+function dpadDir(e){
+  const k=e.key||'', c=e.keyCode||e.which||0;
+  if(k==='ArrowUp'||k==='Up'||c===38) return 'up';
+  if(k==='ArrowDown'||k==='Down'||c===40) return 'down';
+  if(k==='ArrowLeft'||k==='Left'||c===37) return 'left';
+  if(k==='ArrowRight'||k==='Right'||c===39) return 'right';
+  return null;
+}
+function isBackKey(e){
+  const k=e.key||'', c=e.keyCode||e.which||0;
+  return k==='Backspace'||k==='BrowserBack'||k==='GoBack'||k==='Escape'||k==='XF86Back'
+      || c===8||c===27||c===4||c===461||c===10009;
+}
+function pageDir(e){
+  const k=e.key||'', c=e.keyCode||e.which||0;
+  if(k==='PageDown'||k==='ChannelDown'||c===34||c===428||c===167) return 'down';
+  if(k==='PageUp'||k==='ChannelUp'||c===33||c===427||c===166) return 'up';
+  return null;
+}
+const tvHandled=(typeof WeakSet!=='undefined')?new WeakSet():null;
+function tvKeyHandler(e){
+  if(tvHandled){ if(tvHandled.has(e)) return; tvHandled.add(e); }
   const lx=$('lightbox'); if(lx && !lx.classList.contains('hidden')) return;   // el visor gestiona sus propias teclas
-  if(e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
-  const t=e.target, tag=(t.tagName||'').toLowerCase(), k=e.key;
-  const isBack=(k==='Backspace'||k==='BrowserBack'||k==='GoBack'||k==='Escape');
-  if(tag==='iframe'){ if(isBack){ const b=$('back'); if(b){ e.preventDefault(); b.click(); } } return; }
-  if(tag==='input' || tag==='textarea'){ if(k==='ArrowDown'){ e.preventDefault(); tvFocusFirst(); } return; }
-  if(k==='ArrowRight'||k==='ArrowLeft'||k==='ArrowUp'||k==='ArrowDown'){
-    const dir=k.slice(5).toLowerCase();
-    if(!moveFocus(dir) && (dir==='down'||dir==='up')) main.scrollBy({top:(dir==='down'?1:-1)*main.clientHeight*0.8,behavior:'smooth'});
-    e.preventDefault();
+  if(e.altKey||e.ctrlKey||e.metaKey) return;
+  const t=e.target, tag=((t&&t.tagName)||'').toLowerCase();
+  if(tag==='iframe'){ if(isBackKey(e)){ const b=$('back'); if(b){ e.preventDefault(); b.click(); } } return; }
+  if(tag==='input' || tag==='textarea'){ if(dpadDir(e)==='down'){ e.preventDefault(); tvFocusFirst(); } return; }
+  const dir=dpadDir(e);
+  if(dir){
+    let acted=moveFocus(dir);
+    if(!acted && (dir==='down'||dir==='up')){ scrollMain((dir==='down'?1:-1)*Math.round(main.clientHeight*0.82)); acted=true; }
+    if(acted && e.preventDefault) e.preventDefault();
+    return;
   }
-  else if(k==='PageDown'){ e.preventDefault(); main.scrollBy({top:main.clientHeight*0.9,behavior:'smooth'}); }
-  else if(k==='PageUp'){ e.preventDefault(); main.scrollBy({top:-main.clientHeight*0.9,behavior:'smooth'}); }
-  else if(isBack){ const b=$('back'); if(b){ e.preventDefault(); b.click(); } }
-});
+  const pg=pageDir(e);
+  if(pg){ scrollMain((pg==='down'?1:-1)*Math.round(main.clientHeight*0.9)); if(e.preventDefault) e.preventDefault(); return; }
+  if(isBackKey(e)){ const b=$('back'); if(b){ e.preventDefault(); b.click(); } }
+}
+window.addEventListener('keydown', tvKeyHandler, true);
+
+/* botones flotantes de scroll / volver */
+$('tvUp').onclick  =()=> scrollMain(-Math.round(main.clientHeight*0.82));
+$('tvDown').onclick=()=> scrollMain( Math.round(main.clientHeight*0.82));
+$('tvBack').onclick=()=>{ const b=$('back'); if(b) b.click(); else if(typeof showHome==='function') showHome(); };
+
+/* diagnóstico de teclas: abre la página con ?debug=1 y pulsa el mando */
+if(location.search.indexOf('debug')>-1){
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;left:8px;bottom:8px;z-index:99999;background:#000;color:#0f0;font:14px/1.4 monospace;padding:8px 12px;border:1px solid #0f0;pointer-events:none;max-width:90vw';
+  d.textContent='DEBUG teclas — pulsa la cruceta del mando';
+  document.addEventListener('DOMContentLoaded',()=>document.body.appendChild(d));
+  if(document.body) document.body.appendChild(d);
+  const show=(tag,e)=>{ d.textContent=`${tag}  key="${e.key}"  code="${e.code}"  keyCode=${e.keyCode}  which=${e.which}  dir=${dpadDir(e)||'-'}`; };
+  window.addEventListener('keydown',e=>show('keydown',e),true);
+  window.addEventListener('keyup',e=>show('keyup',e),true);
+}
 
 boot();
 </script>
